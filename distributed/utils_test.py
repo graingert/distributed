@@ -10,6 +10,7 @@ import logging
 import logging.config
 import os
 import queue
+import random
 import re
 import shutil
 import signal
@@ -319,9 +320,7 @@ def slowdouble(x, delay=0.02):
 
 
 def randominc(x, scale=1):
-    from random import random
-
-    sleep(random() * scale)
+    sleep(random.random() * scale)
     return x + 1
 
 
@@ -1177,19 +1176,38 @@ def popen(args, **kwargs):
 
 def wait_for_port(address, timeout=5):
     assert isinstance(address, tuple)
-    deadline = time() + timeout
 
-    while True:
-        timeout = deadline - time()
-        if timeout < 0:
-            raise RuntimeError(f"Failed to connect to {address}")
+    start = time()
+
+    def time_left():
+        deadline = start + timeout
+        return max(0, deadline - time())
+
+    backoff_base = 0.01
+    attempt = 0
+
+    # Prefer multiple small attempts than one long attempt. This should protect
+    # primarily from DNS race conditions
+    # gh3104, gh4176, gh4167
+    intermediate_cap = timeout / 5
+    while time_left() > 0:
         try:
-            sock = socket.create_connection(address, timeout=timeout)
+            with socket.create_connection(
+                address, timeout=min(intermediate_cap, time_left())
+            ):
+                break
         except OSError:
-            pass
-        else:
-            sock.close()
-            break
+            # The intermediate capping is mostly relevant for the initial
+            # connect. Afterwards we should be more forgiving
+            intermediate_cap = intermediate_cap * 1.5
+            # FullJitter see https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/
+
+            upper_cap = min(time_left(), backoff_base * (2 ** attempt))
+            backoff = random.uniform(0, upper_cap)
+            attempt += 1
+            sleep(backoff)
+    else:
+        raise RuntimeError(f"Failed to connect to {address}")
 
 
 def wait_for(predicate, timeout, fail_func=None, period=0.001):
