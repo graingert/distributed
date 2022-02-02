@@ -39,6 +39,12 @@ jobs:
       # TEST_ID: ${{ matrix.os }}-${{ matrix.python-version }}-${{ matrix.partition-label }}-${{ matrix.run }}
 
     steps:
+      - name: Disable spotlight
+        if: ${{ matrix.os == 'macos-latest' }}
+        run: |
+          sudo mdutil -ai off
+          killall mds mdworker_shared mds_stores mdworker-sizing | true
+
       - name: Checkout source
         uses: actions/checkout@v2
         with:
