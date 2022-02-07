@@ -39,6 +39,14 @@ jobs:
       # TEST_ID: ${{ matrix.os }}-${{ matrix.python-version }}-${{ matrix.partition-label }}-${{ matrix.run }}
 
     steps:
+      - name: disable MongoDB
+        if: ${{ matrix.os == 'windows-latest' }}
+        shell: pwsh
+        run: |
+          $mongoService = Get-Service -Name MongoDB
+          Stop-Service -InputObject $mongoService
+          Set-Service -InputObject $mongoService -StartupType Disabled
+
       - name: Checkout source
         uses: actions/checkout@v2
         with:
