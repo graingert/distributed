@@ -125,6 +125,13 @@ def log_process_info():
             attrs=["name", "cmdline", "username", *benchmarks], ad_value=0
         )
     ]
+
+    def format_cmdline(proc):
+        cmdline = proc["cmdline"]
+        if cmdline == 0:
+            return "<no cmdline>"
+        return shlex_join(cmdline)
+
     for benchmark in benchmarks:
         print(f"===== {benchmark} =====")
         for proc in sorted(
@@ -133,7 +140,7 @@ def log_process_info():
             reverse=True,
         )[:10]:
             print(
-                f"{proc[benchmark]}: {proc['name']} {shlex_join(proc['cmdline'])} {proc['username']}"
+                f"{proc[benchmark]}: {proc['name']} {format_cmdline(proc)} {proc['username']}"
             )
 
 
