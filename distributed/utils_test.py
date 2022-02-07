@@ -9,9 +9,11 @@ import io
 import logging
 import logging.config
 import multiprocessing
+import operator
 import os
 import queue
 import re
+import shlex
 import shutil
 import signal
 import socket
@@ -29,6 +31,8 @@ from glob import glob
 from itertools import count
 from time import sleep
 from typing import TYPE_CHECKING, Any
+
+import psutil
 
 if TYPE_CHECKING:
     from typing_extensions import Literal
@@ -96,6 +100,41 @@ logging_levels = {
 
 _TEST_TIMEOUT = 30
 _offload_executor.submit(lambda: None).result()  # create thread during import
+
+
+if sys.version_info >= (3, 8):
+    from shlex import join as shlex_join
+else:
+
+    def shlex_join(split_command):
+        """Return a shell-escaped string from *split_command*."""
+        return " ".join(shlex.quote(arg) for arg in split_command)
+
+
+@pytest.fixture(autouse=True)
+def log_process_info():
+    yield
+    benchmarks = [
+        "cpu_percent",
+        "memory_percent",
+        "num_handles" if sys.platform == "win32" else "num_fds",
+    ]
+    processes = [
+        p.info
+        for p in psutil.process_iter(
+            attrs=["name", "cmdline", "username", *benchmarks], ad_value=0
+        )
+    ]
+    for benchmark in benchmarks:
+        print(f"===== {benchmark} =====")
+        for proc in sorted(
+            processes,
+            key=operator.itemgetter(benchmark),
+            reverse=True,
+        )[:10]:
+            print(
+                f"{proc[benchmark]}: {proc['name']} {shlex_join(proc['cmdline'])} {proc['username']}"
+            )
 
 
 @pytest.fixture(scope="session")
