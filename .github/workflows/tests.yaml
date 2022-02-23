@@ -111,30 +111,6 @@ jobs:
         if: ${{ matrix.os != 'windows-latest' }}
         run: sed -i.bak 's/timeout_method = thread/timeout_method = signal/' setup.cfg
 
-      - name: Test
-        id: run_tests
-        shell: bash -l {0}
-        env:
-          PYTHONFAULTHANDLER: 1
-        run: |
-          if [[ "${{ matrix.os }}" = "ubuntu-latest" ]]; then
-              # FIXME ipv6-related failures on Ubuntu github actions CI
-              # https://github.com/dask/distributed/issues/4514
-              export DISABLE_IPV6=1
-          fi
-
-          source continuous_integration/scripts/set_ulimit.sh
-          set -o pipefail
-          mkdir reports
-
-          pytest distributed \
-            -m "not avoid_ci and ${{ matrix.partition }}" --runslow \
-            --exitfirst \
-            --leaks=fds,processes,threads \
-            --junitxml reports/pytest.xml -o junit_suite_name=$TEST_ID \
-            --cov=distributed --cov-report=xml \
-          | tee reports/stdout
-
       - name: Generate junit XML report in case of pytest-timeout
         if: ${{ failure() }}
         shell: bash -l {0}
@@ -148,7 +124,6 @@ jobs:
           fi
 
       - name: Debug with tmate on failure
-        if: ${{ failure() }}
         uses: mxschmitt/action-tmate@v3
 
       - name: Coverage
