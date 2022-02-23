@@ -22,13 +22,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ["3.8", "3.9"]
+        os: [ubuntu-latest]
+        python-version: ["3.9"]
         # Cherry-pick test modules to split the overall runtime roughly in half
-        partition: [ci1, not ci1]
+        partition: [not ci1]
         include:
-          - partition: "ci1"
-            partition-label: "ci1"
           - partition: "not ci1"
             partition-label: "notci1"
 
@@ -131,6 +129,7 @@ jobs:
 
           pytest distributed \
             -m "not avoid_ci and ${{ matrix.partition }}" --runslow \
+            --exitfirst \
             --leaks=fds,processes,threads \
             --junitxml reports/pytest.xml -o junit_suite_name=$TEST_ID \
             --cov=distributed --cov-report=xml \
@@ -148,9 +147,9 @@ jobs:
             python continuous_integration/scripts/parse_stdout.py < reports/stdout > reports/pytest.xml
           fi
 
-      # - name: Debug with tmate on failure
-      #   if: ${{ failure() }}
-      #   uses: mxschmitt/action-tmate@v3
+      - name: Debug with tmate on failure
+        if: ${{ failure() }}
+        uses: mxschmitt/action-tmate@v3
 
       - name: Coverage
         uses: codecov/codecov-action@v1
