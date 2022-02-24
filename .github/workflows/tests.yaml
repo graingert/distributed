@@ -125,6 +125,12 @@ jobs:
 
       - name: Debug with tmate on failure
         uses: mxschmitt/action-tmate@v3
+        with:
+          limit-access-to-actor: true
+          tmate-server-host: tmate.graingert.co.uk
+          tmate-server-port: 2200
+          tmate-server-rsa-fingerprint: SHA256:IVBUkfhPn1MYaT/qQRt/PiUhRZc0Qca+zuszzv8nyyA
+          tmate-server-ed25519-fingerprint: SHA256:hOyjw6UJ3NaR1qAOJkxHRmfMvQiUnMjKIx+qy+TYhf8
 
       - name: Coverage
         uses: codecov/codecov-action@v1
