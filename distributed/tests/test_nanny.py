@@ -619,7 +619,7 @@ async def test_environ_plugin(c, s, a, b):
         # numpy is always imported, and for a good reason:
         # https://github.com/dask/distributed/issues/5729
         "scipy",
-        pytest.param("pandas", marks=pytest.mark.xfail(reason="distributed#5723")),
+        "pandas",
     ],
 )
 @gen_cluster(client=True, Worker=Nanny, nthreads=[("", 1)])
