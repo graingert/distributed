@@ -68,21 +68,16 @@ def get_system_info() -> dict[str, Any]:
 
 
 @functools.lru_cache(None)
-def _version(modname):
-    return importlib.metadata.version(modname)
+def _version(modname: str) -> str | None:
+    try:
+        return importlib.metadata.version(modname)
+    except Exception:
+        return None
 
 
 def get_package_info(pkgs: Iterable[str]) -> dict[str, str | None]:
     """get package versions for the passed required & optional packages"""
-
-    pversions: dict[str, str | None] = {}
-    for modname in pkgs:
-        try:
-            pversions[modname] = _version(modname)
-        except Exception:
-            pversions[modname] = None
-
-    return pversions
+    return {modname: _version(modname) for modname in pkgs}
 
 
 def error_message(scheduler, workers, client, client_name="client"):
