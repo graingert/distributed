@@ -279,7 +279,7 @@ class Server:
         async def _():
             timeout = getattr(self, "death_timeout", 0)
             async with self._startup_lock:
-                if self.status in Status.ANY_RUNNING:
+                if self.status not in {Status.undefined, Status.created, Status.init}:
                     return self
                 if timeout:
                     try:
