@@ -61,7 +61,6 @@ from distributed.proctitle import enable_proctitle_on_children
 from distributed.security import Security
 from distributed.utils import (
     DequeHandler,
-    TimeoutError,
     _offload_executor,
     get_ip,
     get_ipv6,
@@ -71,7 +70,7 @@ from distributed.utils import (
     reset_logger_locks,
     sync,
 )
-from distributed.worker import Worker
+from distributed.worker import WORKER_ANY_RUNNING, Worker
 
 try:
     import dask.array  # register config
@@ -1690,7 +1689,7 @@ def check_instances():
     for w in Worker._instances:
         with suppress(RuntimeError):  # closed IOLoop
             w.loop.add_callback(w.close, report=False, executor_wait=False)
-            if w.status in Status.ANY_RUNNING:
+            if w.status in WORKER_ANY_RUNNING:
                 w.loop.add_callback(w.close)
     Worker._instances.clear()
 

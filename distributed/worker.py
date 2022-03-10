@@ -142,6 +142,12 @@ DEFAULT_METRICS: dict[str, Callable[[Worker], Any]] = {}
 
 DEFAULT_STARTUP_INFORMATION: dict[str, Callable[[Worker], Any]] = {}
 
+WORKER_ANY_RUNNING = {
+    Status.running,
+    Status.paused,
+    Status.closing_gracefully,
+}
+
 
 class Worker(ServerNode):
     """Worker node in a Dask distributed cluster
@@ -1187,9 +1193,9 @@ class Worker(ServerNode):
                 # If running, wait up to 0.5s and then re-register self.
                 # Otherwise just exit.
                 start = time()
-                while self.status in Status.ANY_RUNNING and time() < start + 0.5:
+                while self.status in WORKER_ANY_RUNNING and time() < start + 0.5:
                     await asyncio.sleep(0.01)
-                if self.status in Status.ANY_RUNNING:
+                if self.status in WORKER_ANY_RUNNING:
                     await self._register_with_scheduler()
                 return
 
@@ -1221,7 +1227,7 @@ class Worker(ServerNode):
             logger.exception(e)
             raise
         finally:
-            if self.reconnect and self.status in Status.ANY_RUNNING:
+            if self.reconnect and self.status in WORKER_ANY_RUNNING:
                 logger.info("Connection to scheduler broken.  Reconnecting...")
                 self.loop.add_callback(self.heartbeat)
             else:
@@ -1448,7 +1454,7 @@ class Worker(ServerNode):
                 logger.info("Stopping worker at %s", self.address)
             except ValueError:  # address not available if already closed
                 logger.info("Stopping worker")
-            if self.status not in Status.ANY_RUNNING:
+            if self.status not in WORKER_ANY_RUNNING:
                 logger.info("Closed worker has not yet started: %s", self.status)
             self.status = Status.closing
 
@@ -1478,7 +1484,7 @@ class Worker(ServerNode):
                 if not any(
                     w
                     for w in Worker._instances
-                    if w != self and w.status in Status.ANY_RUNNING
+                    if w != self and w.status in WORKER_ANY_RUNNING
                 ):
                     for c in Worker._initialized_clients:
                         # Regardless of what the client was initialized with
@@ -2973,7 +2979,7 @@ class Worker(ServerNode):
         total_nbytes : int
             Total number of bytes for all the dependencies in to_gather combined
         """
-        if self.status not in Status.ANY_RUNNING:  # type: ignore
+        if self.status not in WORKER_ANY_RUNNING:  # type: ignore
             return
 
         recommendations: Recs = {}
@@ -3185,7 +3191,7 @@ class Worker(ServerNode):
 
         if (
             new_status == Status.closing_gracefully
-            and self._status not in Status.ANY_RUNNING  # type: ignore
+            and self._status not in WORKER_ANY_RUNNING  # type: ignore
         ):
             logger.error(
                 "Invalid Worker.status transition: %s -> %s", self._status, new_status
@@ -3988,7 +3994,7 @@ class Worker(ServerNode):
             ) from e
 
     def validate_state(self):
-        if self.status not in Status.ANY_RUNNING:
+        if self.status not in WORKER_ANY_RUNNING:
             return
         try:
             assert self.executing_count >= 0
@@ -4154,7 +4160,7 @@ def get_worker() -> Worker:
             return first(
                 w
                 for w in Worker._instances
-                if w.status in Status.ANY_RUNNING  # type: ignore
+                if w.status in WORKER_ANY_RUNNING  # type: ignore
             )
         except StopIteration:
             raise ValueError("No workers found")

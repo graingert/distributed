@@ -37,7 +37,6 @@ from distributed.comm import (
 from distributed.metrics import time
 from distributed.system_monitor import SystemMonitor
 from distributed.utils import (
-    TimeoutError,
     get_traceback,
     has_keyword,
     is_coroutine_function,
@@ -70,11 +69,6 @@ class Status(Enum):
 
 
 Status.lookup = {s.name: s for s in Status}  # type: ignore
-Status.ANY_RUNNING = {  # type: ignore
-    Status.running,
-    Status.paused,
-    Status.closing_gracefully,
-}
 
 
 class RPCClosed(IOError):
@@ -246,7 +240,9 @@ class Server:
             self.thread_id = threading.get_ident()
 
         self.io_loop.add_callback(set_thread_ident)
-        self._startup_lock = asyncio.Lock()
+        self._started = asyncio.Event()
+        self.__status = Status.init
+
         self.status = Status.undefined
 
         self.rpc = ConnectionPool(
@@ -260,6 +256,10 @@ class Server:
         )
 
         self.__stopped = False
+
+    @property
+    def server_status(self):
+        return self.__status
 
     @property
     def status(self):
@@ -277,24 +277,19 @@ class Server:
 
     def __await__(self):
         async def _():
-            timeout = getattr(self, "death_timeout", 0)
-            async with self._startup_lock:
-                if self.status not in {Status.undefined, Status.created, Status.init}:
-                    return self
-                if timeout:
-                    try:
-                        await asyncio.wait_for(self.start(), timeout=timeout)
-                        self.status = Status.running
-                    except Exception:
-                        await self.close(timeout=1)
-                        raise TimeoutError(
-                            "{} failed to start in {} seconds".format(
-                                type(self).__name__, timeout
-                            )
-                        )
-                else:
-                    await self.start()
-                    self.status = Status.running
+            if self.__status != Status.init:
+                await self._started.wait()
+                return
+            timeout = getattr(self, "death_timeout", None)
+
+            try:
+                await asyncio.wait_for(self.start(), timeout=timeout)
+            except Exception:
+                await self.close()
+                self.__status = Status.failed
+                raise
+            self.__status = Status.running
+            self._started.set()
             return self
 
         return _().__await__()
@@ -539,7 +534,7 @@ class Server:
                             self._ongoing_coroutines.add(result)
                             result = await result
                     except (CommClosedError, asyncio.CancelledError):
-                        if self.status in Status.ANY_RUNNING:
+                        if not self.__stopped:
                             logger.info("Lost connection to %r", address, exc_info=True)
                         break
                     except Exception as e:

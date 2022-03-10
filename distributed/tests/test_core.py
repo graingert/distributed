@@ -886,7 +886,7 @@ async def test_close_properly():
         await asyncio.sleep(2000000)
 
     server = await Server({"sleep": sleep})
-    assert server.status == Status.running
+    assert server.server_status == Status.running
     ports = [8881, 8882, 8883]
 
     # Previously we close *one* listener, therefore ensure we always use more
