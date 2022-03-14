@@ -240,7 +240,7 @@ class Server:
             self.thread_id = threading.get_ident()
 
         self.io_loop.add_callback(set_thread_ident)
-        self._started = asyncio.Event()
+        self._startup_lock = asyncio.Lock()
         self.__status = Status.init
 
         self.status = Status.undefined
@@ -277,19 +277,18 @@ class Server:
 
     def __await__(self):
         async def _():
-            if self.__status != Status.init:
-                await self._started.wait()
-                return
-            timeout = getattr(self, "death_timeout", None)
+            async with self._startup_lock:
+                if self.__status != Status.init:
+                    return
+                timeout = getattr(self, "death_timeout", None)
 
-            try:
-                await asyncio.wait_for(self.start(), timeout=timeout)
-            except Exception:
-                await self.close()
-                self.__status = Status.failed
-                raise
-            self.__status = Status.running
-            self._started.set()
+                try:
+                    await asyncio.wait_for(self.start(), timeout=timeout)
+                except Exception:
+                    await self.close()
+                    self.__status = Status.failed
+                    raise
+                self.__status = Status.running
             return self
 
         return _().__await__()

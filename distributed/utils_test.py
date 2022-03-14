@@ -149,7 +149,7 @@ def loop():
             except RuntimeError as e:
                 if not re.match("IOLoop is clos(ed|ing)", str(e)):
                     raise
-            except TimeoutError:
+            except asyncio.TimeoutError:
                 pass
             else:
                 is_stopped.wait()
@@ -883,7 +883,7 @@ async def end_cluster(s, workers):
     logger.debug("Closing out test cluster")
 
     async def end_worker(w):
-        with suppress(TimeoutError, CommClosedError, EnvironmentError):
+        with suppress(asyncio.TimeoutError, CommClosedError, EnvironmentError):
             await w.close(report=False)
 
     await asyncio.gather(*(end_worker(w) for w in workers))
@@ -1019,7 +1019,7 @@ def gen_cluster(
                             # Remove as much of the traceback as possible; it's
                             # uninteresting boilerplate from utils_test and asyncio and
                             # not from the code being tested.
-                            raise TimeoutError(
+                            raise asyncio.TimeoutError(
                                 f"Test timeout after {timeout}s.\n"
                                 "========== Test stack trace starts here ==========\n"
                                 f"{buffer.getvalue()}"
