@@ -4029,7 +4029,7 @@ class Scheduler(SchedulerState, ServerNode):
     def __repr__(self):
         parent: SchedulerState = cast(SchedulerState, self)
         return (
-            f"<Scheduler {self.address!r}, "
+            f"<Scheduler {self.address_safe!r}, "
             f"workers: {len(parent._workers_dv)}, "
             f"cores: {parent._total_nthreads}, "
             f"tasks: {len(parent._tasks)}>"
@@ -4225,7 +4225,7 @@ class Scheduler(SchedulerState, ServerNode):
         )
 
         self.start_periodic_callbacks()
-
+        self.status = Status.running
         setproctitle(f"dask-scheduler [{self.address}]")
         return self
 

@@ -26,7 +26,7 @@ from contextlib import contextmanager, nullcontext, suppress
 from glob import glob
 from itertools import count
 from time import sleep
-from typing import Any, Literal
+from typing import Any, Generator, Literal, TypeVar
 
 from distributed.compatibility import MACOS
 from distributed.scheduler import Scheduler
@@ -1962,3 +1962,32 @@ def has_pytestmark(test_func: Callable, name: str) -> bool:
     """
     marks = getattr(test_func, "pytestmark", [])
     return any(mark.name == name for mark in marks)
+
+
+E = TypeVar("E", bound=type)
+
+
+@contextmanager
+def raises_with_cause(
+    expected_exception: E | tuple[E, ...],
+    match: str | None,
+    expected_cause: E | tuple[E, ...],
+    match_cause: str | None,
+) -> Generator[None, None, None]:
+    """Contextmanager to assert that a certain exception with cause was raised
+
+    Parameters
+    ----------
+    exc_type:
+    """
+    with pytest.raises(expected_exception, match=match) as exc_info:  # type: ignore
+        yield
+
+    exc = exc_info.value
+    assert exc.__cause__
+    if not isinstance(exc.__cause__, expected_cause):
+        raise exc
+    if match_cause:
+        assert re.search(
+            match_cause, str(exc.__cause__)
+        ), f"Pattern ``{match_cause}`` not found in ``{exc.__cause__}``"

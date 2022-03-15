@@ -284,10 +284,12 @@ class Server:
 
                 try:
                     await asyncio.wait_for(self.start(), timeout=timeout)
-                except Exception:
+                except Exception as exc:
                     await self.close()
                     self.__status = Status.failed
-                    raise
+                    raise RuntimeError(
+                        f"{type(self).__name__} failed to start."
+                    ) from exc
                 self.__status = Status.running
             return self
 
@@ -355,15 +357,27 @@ class Server:
             self.digests["tick-duration"].add(diff)
 
     @property
-    def address(self):
+    def address(self) -> str:
         """
         The address this Server can be contacted on.
+        If the server is not up, yet, this raises a ValueError.
         """
         if not self._address:
             if self.listener is None:
                 raise ValueError("cannot get address of non-running Server")
             self._address = self.listener.contact_address
         return self._address
+
+    @property
+    def address_safe(self) -> str:
+        """
+        The address this Server can be contacted on.
+        If the server is not up, yet, this returns a ``"not-running"``.
+        """
+        try:
+            return self.address
+        except ValueError:
+            return "not-running"
 
     @property
     def listen_address(self):

@@ -912,9 +912,9 @@ class Worker(ServerNode):
     ##################
 
     def __repr__(self):
-        name = f", name: {self.name}" if self.name != self.address else ""
+        name = f", name: {self.name}" if self.name != self.address_safe else ""
         return (
-            f"<{self.__class__.__name__} {self.address!r}{name}, "
+            f"<{self.__class__.__name__} {self.address_safe!r}{name}, "
             f"status: {self.status.name}, "
             f"stored: {len(self.data)}, "
             f"running: {self.executing_count}/{self.nthreads}, "
@@ -1357,7 +1357,7 @@ class Worker(ServerNode):
                 break
         else:
             raise ValueError(
-                f"Could not start Worker on host {self._start_host}"
+                f"Could not start Worker on host {self._start_host} "
                 f"with port {self._start_port}"
             )
 
@@ -1449,7 +1449,6 @@ class Worker(ServerNode):
 
             self.reconnect = False
             disable_gc_diagnosis()
-
             try:
                 logger.info("Stopping worker at %s", self.address)
             except ValueError:  # address not available if already closed
@@ -1501,7 +1500,9 @@ class Worker(ServerNode):
                             c.close()
 
             with suppress(EnvironmentError, TimeoutError):
-                if report and self.contact_address is not None:
+                if report and self.status in {Status.running, Status.paused}:
+                    assert self.contact_address
+                    print("Unregister with scheduler")
                     await asyncio.wait_for(
                         self.scheduler.unregister(
                             address=self.contact_address, safe=safe
