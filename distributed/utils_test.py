@@ -26,7 +26,7 @@ from contextlib import contextmanager, nullcontext, suppress
 from glob import glob
 from itertools import count
 from time import sleep
-from typing import Any, Generator, Literal, TypeVar
+from typing import Any, Generator, Literal
 
 from distributed.compatibility import MACOS
 from distributed.scheduler import Scheduler
@@ -1964,14 +1964,11 @@ def has_pytestmark(test_func: Callable, name: str) -> bool:
     return any(mark.name == name for mark in marks)
 
 
-E = TypeVar("E", bound=type)
-
-
 @contextmanager
 def raises_with_cause(
-    expected_exception: E | tuple[E, ...],
+    expected_exception: type[BaseException] | tuple[type[BaseException], ...],
     match: str | None,
-    expected_cause: E | tuple[E, ...],
+    expected_cause: type[BaseException] | tuple[type[BaseException], ...],
     match_cause: str | None,
 ) -> Generator[None, None, None]:
     """Contextmanager to assert that a certain exception with cause was raised
@@ -1980,7 +1977,7 @@ def raises_with_cause(
     ----------
     exc_type:
     """
-    with pytest.raises(expected_exception, match=match) as exc_info:  # type: ignore
+    with pytest.raises(expected_exception, match=match) as exc_info:
         yield
 
     exc = exc_info.value
