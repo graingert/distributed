@@ -2662,7 +2662,7 @@ class TaskGroupProgress(DashboardComponent):
         back = None
         # Remove any periods of zero compute at the front or back of the timeseries
         if len(self.plugin.compute):
-            agg = sum([np.array(v[front:]) for v in self.plugin.compute.values()])
+            agg = sum(np.array(v[front:]) for v in self.plugin.compute.values())
             front2 = len(agg) - len(np.trim_zeros(agg, trim="f"))
             front += front2
             back = len(np.trim_zeros(agg, trim="b")) - len(agg) or None
