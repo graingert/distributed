@@ -71,7 +71,8 @@ def echo_no_serialize(comm, x):
     return {"result": x}
 
 
-def test_server_status_is_always_enum():
+@gen_test()
+async def test_server_status_is_always_enum():
     """Assignments with strings is forbidden"""
     server = Server({})
     assert isinstance(server.status, Status)
@@ -82,69 +83,67 @@ def test_server_status_is_always_enum():
         server.status = "running"
 
 
-def test_server_assign_assign_enum_is_quiet():
+@gen_test()
+async def test_server_assign_assign_enum_is_quiet():
     """That would be the default in user code"""
     server = Server({})
     server.status = Status.running
 
 
-def test_server_status_compare_enum_is_quiet():
+@gen_test()
+async def test_server_status_compare_enum_is_quiet():
     """That would be the default in user code"""
     server = Server({})
     server.status == Status.running
 
 
-def test_server(loop):
+@gen_test()
+async def test_server():
     """
     Simple Server test.
     """
 
-    async def f():
-        server = Server({"ping": pingpong})
-        with pytest.raises(ValueError):
-            server.port
+    server = Server({"ping": pingpong})
+    with pytest.raises(ValueError):
+        server.port
+    await server.listen(8881)
+    assert server.port == 8881
+    assert server.address == ("tcp://%s:8881" % get_ip())
+    await server
+
+    for addr in ("127.0.0.1:8881", "tcp://127.0.0.1:8881", server.address):
+        comm = await connect(addr)
+
+        n = await comm.write({"op": "ping"})
+        assert isinstance(n, int)
+        assert 4 <= n <= 1000
+
+        response = await comm.read()
+        assert response == b"pong"
+
+        await comm.write({"op": "ping", "close": True})
+        response = await comm.read()
+        assert response == b"pong"
+
+        await comm.close()
+
+    server.stop()
+
+
+@gen_test()
+async def test_server_raises_on_blocked_handlers():
+    async with Server({"ping": pingpong}, blocked_handlers=["ping"]) as server:
         await server.listen(8881)
-        assert server.port == 8881
-        assert server.address == ("tcp://%s:8881" % get_ip())
-        await server
 
-        for addr in ("127.0.0.1:8881", "tcp://127.0.0.1:8881", server.address):
-            comm = await connect(addr)
+        comm = await connect(server.address)
+        await comm.write({"op": "ping"})
+        msg = await comm.read()
 
-            n = await comm.write({"op": "ping"})
-            assert isinstance(n, int)
-            assert 4 <= n <= 1000
+        _, exception, _ = clean_exception(msg["exception"])
+        assert isinstance(exception, ValueError)
+        assert "'ping' handler has been explicitly disallowed" in repr(exception)
 
-            response = await comm.read()
-            assert response == b"pong"
-
-            await comm.write({"op": "ping", "close": True})
-            response = await comm.read()
-            assert response == b"pong"
-
-            await comm.close()
-
-        server.stop()
-
-    loop.run_sync(f)
-
-
-def test_server_raises_on_blocked_handlers(loop):
-    async def f():
-        async with Server({"ping": pingpong}, blocked_handlers=["ping"]) as server:
-            await server.listen(8881)
-
-            comm = await connect(server.address)
-            await comm.write({"op": "ping"})
-            msg = await comm.read()
-
-            _, exception, _ = clean_exception(msg["exception"])
-            assert isinstance(exception, ValueError)
-            assert "'ping' handler has been explicitly disallowed" in repr(exception)
-
-            await comm.close()
-
-    res = loop.run_sync(f)
+        await comm.close()
 
 
 class MyServer(Server):
@@ -790,19 +789,16 @@ async def test_tick_logging(s, a, b):
 
 @pytest.mark.parametrize("compression", list(compressions))
 @pytest.mark.parametrize("serialize", [echo_serialize, echo_no_serialize])
-def test_compression(compression, serialize, loop):
+@gen_test()
+async def test_compression(compression, serialize):
     with dask.config.set(compression=compression):
+        async with Server({"echo": serialize}) as server:
+            await server.listen("tcp://")
 
-        async def f():
-            async with Server({"echo": serialize}) as server:
-                await server.listen("tcp://")
-
-                with rpc(server.address) as r:
-                    data = b"1" * 1000000
-                    result = await r.echo(x=to_serialize(data))
-                    assert result == {"result": data}
-
-        loop.run_sync(f)
+            with rpc(server.address) as r:
+                data = b"1" * 1000000
+                result = await r.echo(x=to_serialize(data))
+                assert result == {"result": data}
 
 
 @pytest.mark.asyncio
