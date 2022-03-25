@@ -372,7 +372,7 @@ class SpecCluster(Cluster):
                 dask.config.get("distributed.deploy.lost-worker-timeout")
             )
 
-            asyncio.get_event_loop().call_later(delay, f)
+            asyncio.get_running_loop().call_later(delay, f)
         super()._update_worker_status(op, msg)
 
     def __await__(self):
