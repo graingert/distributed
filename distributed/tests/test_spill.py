@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import itertools
 import logging
 import os
-import uuid
 
 import pytest
 
@@ -285,6 +285,9 @@ def test_spillbuffer_evict(tmpdir):
     assert_buf(buf, {"bad": bad}, {"a": a})
 
 
+_id_counter = itertools.count().__next__
+
+
 class NoWeakRef:
     """A class which
     1. reports an arbitrary managed memory usage
@@ -296,7 +299,7 @@ class NoWeakRef:
 
     def __init__(self, size):
         self.size = size
-        self.id = uuid.uuid4()
+        self.id = _id_counter()
 
     def __sizeof__(self):
         return self.size
