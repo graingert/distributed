@@ -23,6 +23,7 @@ dependencies:
   - lz4  # Only tested here
   - msgpack-python
   - netcdf4
+  - objgraph
   - paramiko
   - pre-commit
   - prometheus_client

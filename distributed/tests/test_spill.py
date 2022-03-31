@@ -3,9 +3,11 @@ from __future__ import annotations
 import gc
 import logging
 import os
+import sys
 import uuid
 import weakref
 
+import objgraph
 import pytest
 
 from dask.sizeof import sizeof
@@ -316,6 +318,20 @@ class SupportsWeakRef(NoWeakRef):
     __slots__ = ("__weakref__",)
 
 
+def _print_chain(o_wr):
+    o = o_wr()
+    print(f"=========== obgraph {id(o)=} =============")
+    if o is None:
+        print("was None")
+        return
+
+    objgraph.show_chain(
+        objgraph.find_backref_chain(o, objgraph.is_proper_module),
+        output=sys.stdout,
+    )
+    return o
+
+
 @pytest.mark.parametrize(
     "cls,expect_cached",
     [
@@ -350,7 +366,7 @@ def test_weakref_cache(tmpdir, cls, expect_cached, size):
         assert (canary() is not None) == expect_cached
         buf["y"]
 
-    assert canary() is None
+    assert _print_chain(canary) is None
     assert "x" in buf.slow
 
     x2 = buf["x"]
