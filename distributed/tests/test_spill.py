@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import gc
 import logging
 import os
 import uuid
+import weakref
 
 import pytest
 
@@ -285,6 +287,10 @@ def test_spillbuffer_evict(tmpdir):
     assert_buf(buf, {"bad": bad}, {"a": a})
 
 
+class _Canary:
+    pass
+
+
 class NoWeakRef:
     """A class which
     1. reports an arbitrary managed memory usage
@@ -292,11 +298,12 @@ class NoWeakRef:
     3. has a property `id` which changes every time it is unpickled
     """
 
-    __slots__ = ("size", "id")
+    __slots__ = ("size", "id", "canary")
 
     def __init__(self, size):
         self.size = size
         self.id = uuid.uuid4()
+        self.canary = _Canary()
 
     def __sizeof__(self):
         return self.size
@@ -324,6 +331,7 @@ def test_weakref_cache(tmpdir, cls, expect_cached, size):
     # - x is smaller than target and is evicted by y;
     # - x is individually larger than target and it never touches fast
     x = cls(size)
+    canary = weakref.ref(x.canary)
     buf["x"] = x
     if size < 100:
         buf["y"] = cls(60)  # spill x
@@ -339,7 +347,10 @@ def test_weakref_cache(tmpdir, cls, expect_cached, size):
     del x
 
     if size < 100:
+        assert (canary() is not None) == expect_cached
         buf["y"]
+
+    assert canary() is None
     assert "x" in buf.slow
 
     x2 = buf["x"]
