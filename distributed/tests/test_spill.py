@@ -315,8 +315,13 @@ class SupportsWeakRef(NoWeakRef):
     __slots__ = ("__weakref__",)
 
 
-def _print_chain(o):
-    print(f"=========== obgraph {id(o)} =============")
+def _print_chain(o_wr):
+    o = o_wr()
+    print(f"=========== obgraph {id(o)=} =============")
+    if o is None:
+        print("was None")
+        return
+
     objgraph.show_chain(
         objgraph.find_backref_chain(o, objgraph.is_proper_module),
         output=sys.stdout,
@@ -363,7 +368,7 @@ def test_weakref_cache(tmpdir, cls, expect_cached, size):
         buf["y"]
     assert "x" in buf.slow
 
-    _print_chain(x_wr())
+    _print_chain(x_wr)
     x2 = buf["x"]
     assert x2.id != id_x
     if size < 100:
