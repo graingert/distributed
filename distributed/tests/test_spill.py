@@ -325,39 +325,43 @@ class SupportsWeakRef(NoWeakRef):
 )
 @pytest.mark.parametrize("size", [60, 110])
 def test_weakref_cache(tmpdir, cls, expect_cached, size):
-    buf = SpillBuffer(str(tmpdir), target=100)
+    gc.disable()
+    try:
+        buf = SpillBuffer(str(tmpdir), target=100)
 
-    # Run this test twice:
-    # - x is smaller than target and is evicted by y;
-    # - x is individually larger than target and it never touches fast
-    x = cls(size)
-    canary = weakref.ref(x.canary)
-    buf["x"] = x
-    if size < 100:
-        buf["y"] = cls(60)  # spill x
-    assert "x" in buf.slow
+        # Run this test twice:
+        # - x is smaller than target and is evicted by y;
+        # - x is individually larger than target and it never touches fast
+        x = cls(size)
+        canary = weakref.ref(x.canary)
+        buf["x"] = x
+        if size < 100:
+            buf["y"] = cls(60)  # spill x
+        assert "x" in buf.slow
 
-    # Test that we update the weakref cache on setitem
-    assert (buf["x"] is x) == expect_cached
+        # Test that we update the weakref cache on setitem
+        assert (buf["x"] is x) == expect_cached
 
-    # Do not use id_x = id(x), as in CPython id's are C memory addresses and are reused
-    # by PyMalloc when you descope objects, so a brand new object might end up having
-    # the same id as a deleted one
-    id_x = x.id
-    del x
+        # Do not use id_x = id(x), as in CPython id's are C memory addresses and are reused
+        # by PyMalloc when you descope objects, so a brand new object might end up having
+        # the same id as a deleted one
+        id_x = x.id
+        del x
 
-    if size < 100:
-        assert (canary() is not None) == expect_cached
-        buf["y"]
+        if size < 100:
+            assert (canary() is not None) == expect_cached
+            buf["y"]
 
-    assert canary() is None
-    assert "x" in buf.slow
+        assert canary() is None
+        assert "x" in buf.slow
 
-    x2 = buf["x"]
-    assert x2.id != id_x
-    if size < 100:
-        buf["y"]
-    assert "x" in buf.slow
+        x2 = buf["x"]
+        assert x2.id != id_x
+        if size < 100:
+            buf["y"]
+        assert "x" in buf.slow
 
-    # Test that we update the weakref cache on getitem
-    assert (buf["x"] is x2) == expect_cached
+        # Test that we update the weakref cache on getitem
+        assert (buf["x"] is x2) == expect_cached
+    finally:
+        gc.enable()
