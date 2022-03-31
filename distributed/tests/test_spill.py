@@ -363,7 +363,6 @@ def test_weakref_cache(tmpdir, cls, expect_cached, size):
     del x
 
     if size < 100:
-        assert (canary() is not None) == expect_cached
         buf["y"]
 
     assert _print_chain(canary) is None
