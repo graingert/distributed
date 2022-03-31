@@ -20,6 +20,7 @@ dependencies:
   - jupyter_client
   - msgpack-python
   - netcdf4
+  - objgraph
   - paramiko
   - pre-commit
   - prometheus_client

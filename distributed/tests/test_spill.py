@@ -3,7 +3,10 @@ from __future__ import annotations
 import itertools
 import logging
 import os
+import sys
+import weakref
 
+import objgraph
 import pytest
 
 from dask.sizeof import sizeof
@@ -312,6 +315,14 @@ class SupportsWeakRef(NoWeakRef):
     __slots__ = ("__weakref__",)
 
 
+def _print_chain(o):
+    print(f"=========== obgraph {id(o)} =============")
+    objgraph.show_chain(
+        objgraph.find_backref_chain(o, objgraph.is_proper_module),
+        output=sys.stdout,
+    )
+
+
 @pytest.mark.parametrize(
     "cls,expect_cached",
     [
@@ -327,6 +338,13 @@ def test_weakref_cache(tmpdir, cls, expect_cached, size):
     # - x is smaller than target and is evicted by y;
     # - x is individually larger than target and it never touches fast
     x = cls(size)
+    try:
+        x_wr = weakref.ref(x)
+    except TypeError:
+
+        def x_wr():
+            return None
+
     buf["x"] = x
     if size < 100:
         buf["y"] = cls(60)  # spill x
@@ -345,6 +363,7 @@ def test_weakref_cache(tmpdir, cls, expect_cached, size):
         buf["y"]
     assert "x" in buf.slow
 
+    _print_chain(x_wr())
     x2 = buf["x"]
     assert x2.id != id_x
     if size < 100:
