@@ -31,8 +31,8 @@ import dis
 import linecache
 import sys
 import threading
+import weakref
 from collections import defaultdict, deque
-from time import sleep
 from typing import Any
 
 import tlz as toolz
@@ -275,14 +275,22 @@ def plot_data(state, profile_interval=0.010):
     }
 
 
-def _watch(thread_id, log, interval="20ms", cycle="2s", omit=None, stop=lambda: False):
+def _watch(
+    thread_id,
+    log,
+    stop_event,
+    interval="20ms",
+    cycle="2s",
+    omit=None,
+    stop=lambda: False,
+):
     interval = parse_timedelta(interval)
     cycle = parse_timedelta(cycle)
 
     recent = create()
     last = time()
 
-    while not stop():
+    while not stop() and not stop_event.is_set():
         if time() > last + cycle:
             log.append((time(), recent))
             recent = create()
@@ -293,7 +301,44 @@ def _watch(thread_id, log, interval="20ms", cycle="2s", omit=None, stop=lambda: 
             return
 
         process(frame, None, recent, omit=omit)
-        sleep(interval)
+        stop_event.wait(interval)
+
+
+class _Profile(threading.Thread):
+    def __init__(self, thread_id, interval, cycle, log, omit, stop):
+        self._stop_event = stop_event = threading.Event()
+        super().__init__(
+            name="Profile",
+            target=_watch,
+            kwargs={
+                "stop_event": stop_event,
+                "thread_id": thread_id,
+                "interval": interval,
+                "cycle": cycle,
+                "log": log,
+                "omit": omit,
+                "stop": stop,
+            },
+            daemon=True,
+        )
+
+    def close(self) -> None:
+        self._stop_event.set()
+        self.join()
+
+
+_profiles: weakref.WeakSet[_Profile] = weakref.WeakSet()
+
+
+def shutdown_profile_threads():
+    pop = _profiles.pop
+    while True:
+        try:
+            profile = pop()
+        except KeyError:
+            return
+
+        profile.close()
 
 
 def watch(
@@ -332,20 +377,17 @@ def watch(
 
     log = deque(maxlen=maxlen)
 
-    thread = threading.Thread(
-        target=_watch,
-        name="Profile",
-        kwargs={
-            "thread_id": thread_id,
-            "interval": interval,
-            "cycle": cycle,
-            "log": log,
-            "omit": omit,
-            "stop": stop,
-        },
+    thread = _Profile(
+        thread_id=thread_id,
+        interval=interval,
+        cycle=cycle,
+        log=log,
+        omit=omit,
+        stop=stop,
     )
-    thread.daemon = True
+
     thread.start()
+    _profiles.add(thread)
 
     return log
 
