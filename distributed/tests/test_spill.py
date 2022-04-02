@@ -332,6 +332,7 @@ def _print_chain(o_wr):
     return o
 
 
+@pytest.mark.parametrize("attempt", range(1000))
 @pytest.mark.parametrize(
     "cls,expect_cached",
     [
@@ -340,39 +341,47 @@ def _print_chain(o_wr):
     ],
 )
 @pytest.mark.parametrize("size", [60, 110])
-def test_weakref_cache(tmpdir, cls, expect_cached, size):
-    buf = SpillBuffer(str(tmpdir), target=100)
+def test_weakref_cache(tmpdir, cls, expect_cached, size, attempt):
+    from distributed.profile import shutdown_profile_threads
 
-    # Run this test twice:
-    # - x is smaller than target and is evicted by y;
-    # - x is individually larger than target and it never touches fast
-    x = cls(size)
-    canary = weakref.ref(x.canary)
-    buf["x"] = x
-    if size < 100:
-        buf["y"] = cls(60)  # spill x
-    assert "x" in buf.slow
+    shutdown_profile_threads()
 
-    # Test that we update the weakref cache on setitem
-    assert (buf["x"] is x) == expect_cached
+    gc.disable()
+    try:
+        buf = SpillBuffer(str(tmpdir), target=100)
 
-    # Do not use id_x = id(x), as in CPython id's are C memory addresses and are reused
-    # by PyMalloc when you descope objects, so a brand new object might end up having
-    # the same id as a deleted one
-    id_x = x.id
-    del x
+        # Run this test twice:
+        # - x is smaller than target and is evicted by y;
+        # - x is individually larger than target and it never touches fast
+        x = cls(size)
+        canary = weakref.ref(x.canary)
+        buf["x"] = x
+        if size < 100:
+            buf["y"] = cls(60)  # spill x
+        assert "x" in buf.slow
 
-    if size < 100:
-        buf["y"]
+        # Test that we update the weakref cache on setitem
+        assert (buf["x"] is x) == expect_cached
 
-    assert _print_chain(canary) is None
-    assert "x" in buf.slow
+        # Do not use id_x = id(x), as in CPython id's are C memory addresses and are reused
+        # by PyMalloc when you descope objects, so a brand new object might end up having
+        # the same id as a deleted one
+        id_x = x.id
+        del x
 
-    x2 = buf["x"]
-    assert x2.id != id_x
-    if size < 100:
-        buf["y"]
-    assert "x" in buf.slow
+        if size < 100:
+            buf["y"]
 
-    # Test that we update the weakref cache on getitem
-    assert (buf["x"] is x2) == expect_cached
+        assert canary() is None
+        assert "x" in buf.slow
+
+        x2 = buf["x"]
+        assert x2.id != id_x
+        if size < 100:
+            buf["y"]
+        assert "x" in buf.slow
+
+        # Test that we update the weakref cache on getitem
+        assert (buf["x"] is x2) == expect_cached
+    finally:
+        gc.enable()
