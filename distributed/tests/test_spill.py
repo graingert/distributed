@@ -342,9 +342,9 @@ def _print_chain(o_wr):
 )
 @pytest.mark.parametrize("size", [60, 110])
 def test_weakref_cache(tmpdir, cls, expect_cached, size, attempt):
-    from distributed.profile import shutdown_profile_threads
+    # from distributed.profile import shutdown_profile_threads
 
-    shutdown_profile_threads()
+    # shutdown_profile_threads()
 
     gc.disable()
     try:

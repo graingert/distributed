@@ -29,7 +29,6 @@ from __future__ import annotations
 import bisect
 import dis
 import linecache
-import sys
 import threading
 import weakref
 from collections import defaultdict, deque
@@ -295,12 +294,12 @@ def _watch(
             log.append((time(), recent))
             recent = create()
             last = time()
-        try:
-            frame = sys._current_frames()[thread_id]
-        except KeyError:
-            return
+        # try:
+        #     frame = sys._current_frames()[thread_id]
+        # except KeyError:
+        #     return
 
-        process(frame, None, recent, omit=omit)
+        # process(frame, None, recent, omit=omit)
         stop_event.wait(interval)
 
 
