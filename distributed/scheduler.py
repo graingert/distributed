@@ -7734,8 +7734,8 @@ class WorkerStatusPlugin(SchedulerPlugin):
         except CommClosedError:
             self.scheduler.remove_plugin(name=self.name)
 
-    async def teardown(self):
-        await self.bcomm.close()
+    async def before_close(self):
+        return await self.bcomm.close()
 
 
 class CollectTaskMetaDataPlugin(SchedulerPlugin):
