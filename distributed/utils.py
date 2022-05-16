@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import contextvars
+import dataclasses
 import functools
 import importlib
 import inspect
@@ -20,7 +22,14 @@ import weakref
 import xml.etree.ElementTree
 from asyncio import TimeoutError
 from collections import OrderedDict, UserDict, deque
-from collections.abc import Callable, Collection, Container, KeysView, ValuesView
+from collections.abc import (
+    Awaitable,
+    Callable,
+    Collection,
+    Container,
+    KeysView,
+    ValuesView,
+)
 from concurrent.futures import CancelledError, ThreadPoolExecutor  # noqa: F401
 from contextlib import contextmanager, suppress
 from contextvars import ContextVar
@@ -389,6 +398,16 @@ def sync(loop, func, *args, callback_timeout=None, **kwargs):
         return result
 
 
+@dataclasses.dataclass(frozen=True)
+class _LoopThread:
+    fut: concurrent.futures.Future[None]
+    thread: threading.Thread
+
+    def result(self, timeout: None | float) -> None:
+        self.fut.result(timeout=timeout)
+        self.thread.join()
+
+
 class LoopRunner:
     """
     A helper to start and stop an IO loop in a controlled way.
@@ -412,7 +431,7 @@ class LoopRunner:
     ] = weakref.WeakKeyDictionary()
     _lock = threading.Lock()
 
-    def __init__(self, loop=None, asynchronous=False):
+    def __init__(self, loop: IOLoop | None = None, asynchronous: bool = False):
         if loop is None:
             if asynchronous:
                 self._loop = IOLoop.current()
@@ -423,12 +442,12 @@ class LoopRunner:
         else:
             self._loop = loop
         self._asynchronous = asynchronous
-        self._loop_thread = None
+        self._loop_thread: _LoopThread | None = None
         self._started = False
         with self._lock:
             self._all_loops.setdefault(self._loop, (0, None))
 
-    def start(self):
+    def start(self) -> None:
         """
         Start the IO loop if required.  The loop is run in a dedicated
         thread.
@@ -438,64 +457,65 @@ class LoopRunner:
         with self._lock:
             self._start_unlocked()
 
-    def _start_unlocked(self):
+    def _start_unlocked(self) -> None:
+        loop = self._loop
         assert not self._started
 
-        count, real_runner = self._all_loops[self._loop]
+        count, real_runner = self._all_loops[loop]
         if self._asynchronous or real_runner is not None or count > 0:
-            self._all_loops[self._loop] = count + 1, real_runner
+            self._all_loops[loop] = count + 1, real_runner
             self._started = True
             return
 
         assert self._loop_thread is None
         assert count == 0
 
-        loop_evt = threading.Event()
-        done_evt = threading.Event()
-        in_thread = [None]
-        start_exc = [None]
+        loop_cb_fut: concurrent.futures.Future[
+            threading.Thread
+        ] = concurrent.futures.Future()
 
         def loop_cb():
-            in_thread[0] = threading.current_thread()
-            loop_evt.set()
+            loop_cb_fut.set_result(threading.current_thread())
 
-        def run_loop(loop=self._loop):
-            loop.add_callback(loop_cb)
-            # run loop forever if it's not running already
+        def run_loop():
             try:
+                loop.add_callback(loop_cb)
+                # run loop forever if it's not running already
                 if not loop.asyncio_loop.is_running():
                     loop.start()
-            except Exception as e:
-                start_exc[0] = e
-            finally:
-                done_evt.set()
+            except BaseException as e:
+                run_loop_fut.set_exception(e)
+            else:
+                run_loop_fut.set_result(None)
 
-        thread = threading.Thread(target=run_loop, name="IO loop")
-        thread.daemon = True
+        run_loop_fut: concurrent.futures.Future[None] = concurrent.futures.Future()
+        thread = threading.Thread(
+            target=run_loop,
+            name="IO loop",
+            daemon=True,
+        )
         thread.start()
+        loop_thread = _LoopThread(fut=run_loop_fut, thread=thread)
 
-        loop_evt.wait(timeout=10)
-        self._started = True
+        futs: list[concurrent.futures.Future[AnyType]] = [run_loop_fut, loop_cb_fut]
+        for fut in concurrent.futures.as_completed(futs, timeout=10):
+            if fut is loop_cb_fut:
+                self._started = True
+                if loop_cb_fut.result() is thread:
+                    self._loop_thread = loop_thread
+                    self._all_loops[loop] = count + 1, self
+                    return
+                # Loop already running in other thread (user-launched)
+                self._all_loops[loop] = count + 1, None
+                continue
 
-        actual_thread = in_thread[0]
-        if actual_thread is not thread:
-            # Loop already running in other thread (user-launched)
-            done_evt.wait(5)
-            if start_exc[0] is not None and not isinstance(start_exc[0], RuntimeError):
-                if not isinstance(
-                    start_exc[0], Exception
-                ):  # track down infrequent error
-                    raise TypeError(
-                        f"not an exception: {start_exc[0]!r}",
-                    )
-                raise start_exc[0]
-            self._all_loops[self._loop] = count + 1, None
-        else:
-            assert start_exc[0] is None, start_exc
-            self._loop_thread = thread
-            self._all_loops[self._loop] = count + 1, self
+            if fut is run_loop_fut:
+                loop_thread.result(timeout=None)
+                if not self._started:
+                    continue
+                return
 
-    def stop(self, timeout=10):
+    def stop(self, timeout: float | None = 10) -> None:
         """
         Stop and close the loop if it was created by us.
         Otherwise, just mark this object "stopped".
@@ -503,7 +523,7 @@ class LoopRunner:
         with self._lock:
             self._stop_unlocked(timeout)
 
-    def _stop_unlocked(self, timeout):
+    def _stop_unlocked(self, timeout: float | None) -> None:
         if not self._started:
             return
 
@@ -518,24 +538,27 @@ class LoopRunner:
             if real_runner is not None:
                 real_runner._real_stop(timeout)
 
-    def _real_stop(self, timeout):
+    def _real_stop(self, timeout: None | float) -> None:
         assert self._loop_thread is not None
         if self._loop_thread is not None:
             try:
                 self._loop.add_callback(self._loop.stop)
-                self._loop_thread.join(timeout=timeout)
+                self._loop_thread.result(timeout=timeout)
                 with suppress(KeyError):  # IOLoop can be missing
                     self._loop.close()
             finally:
+                self._run_loop_fut = None
                 self._loop_thread = None
 
-    def is_started(self):
+    def is_started(self) -> bool:
         """
         Return True between start() and stop() calls, False otherwise.
         """
         return self._started
 
-    def run_sync(self, func, *args, **kwargs):
+    def run_sync(
+        self, func: Callable[P, Awaitable[T]], /, *args: P.args, **kwargs: P.kwargs
+    ) -> T:
         """
         Convenience helper: start the loop if needed,
         run sync(func, *args, **kwargs), then stop the loop again.
@@ -550,7 +573,7 @@ class LoopRunner:
                 self.stop()
 
     @property
-    def loop(self):
+    def loop(self) -> IOLoop | None:
         return self._loop
 
 
