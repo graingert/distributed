@@ -62,7 +62,6 @@ class Cluster(SyncMethodMixin):
         scheduler_sync_interval=1,
     ):
         self._loop_runner = LoopRunner(loop=loop, asynchronous=asynchronous)
-        self.loop = self._loop_runner.loop
 
         self.scheduler_info = {"workers": {}}
         self.periodic_callbacks = {}
@@ -87,6 +86,10 @@ class Cluster(SyncMethodMixin):
             **type(self)._cluster_info,
         }
         self.status = Status.created
+
+    @property
+    def loop(self):
+        return self._loop_runner.loop
 
     @property
     def name(self):
