@@ -197,10 +197,10 @@ class Cluster(SyncMethodMixin):
         with suppress(RuntimeError):  # loop closed during process shutdown
             return self.sync(self._close, callback_timeout=timeout)
 
-    def __del__(self):
-        if getattr(self, "status", Status.closed) != Status.closed:
-            with suppress(AttributeError, RuntimeError):  # during closing
-                self.loop.add_callback(self.close)
+    # def __del__(self):
+    #     if getattr(self, "status", Status.closed) != Status.closed:
+    #         with suppress(AttributeError, RuntimeError):  # during closing
+    #             self.loop.add_callback(self.close)
 
     async def _watch_worker_status(self, comm):
         """Listen to scheduler for updates on adding and removing workers"""
