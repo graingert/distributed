@@ -5499,11 +5499,20 @@ async def test_future_auto_inform(c, s, a, b):
     await client.close()
 
 
-def test_client_async_before_loop_starts():
+def test_client_async_before_loop_starts(cleanup):
     with pristine_loop() as loop:
-        client = Client(asynchronous=True, loop=loop)
+        with pytest.warns(
+            DeprecationWarning,
+            match=r"Constructing LoopRunner\(loop=loop\) without a running loop is deprecated",
+        ):
+            client = Client(asynchronous=True, loop=loop)
         assert client.asynchronous
-        client.close()
+
+        async def _():
+            async with client:
+                pass
+
+        loop.run_sync(_)
 
 
 @pytest.mark.slow
