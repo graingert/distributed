@@ -1,3 +1,5 @@
+import asyncio
+
 import psutil
 import pytest
 
@@ -244,11 +246,15 @@ def get_scheduler_address():
 """
 
 
-def test_preload_file(loop):
+def test_preload_file(cleanup):
     def check_scheduler():
         import scheduler_info
 
         return scheduler_info.get_scheduler_address()
+
+    async def acheck_scheduler():
+        async with Client(scheduler_file=fn, asynchronous=True) as c:
+            assert await c.run_on_scheduler(check_scheduler) == c.scheduler.address
 
     tmpdir = tempfile.mkdtemp()
     try:
@@ -257,8 +263,7 @@ def test_preload_file(loop):
             f.write(PRELOAD_TEXT)
         with tmpfile() as fn:
             with popen(["dask-scheduler", "--scheduler-file", fn, "--preload", path]):
-                with Client(scheduler_file=fn, loop=loop) as c:
-                    assert c.run_on_scheduler(check_scheduler) == c.scheduler.address
+                asyncio.run(acheck_scheduler())
     finally:
         shutil.rmtree(tmpdir)
 
