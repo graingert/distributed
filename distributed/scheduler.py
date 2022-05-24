@@ -2882,6 +2882,12 @@ class Scheduler(SchedulerState, ServerNode):
         transition_counter_max=False,
         **kwargs,
     ):
+        if loop is not None:
+            warnings.warn(
+                "the loop kwarg to Scheduler is deprecated", DeprecationWarning
+            )
+
+        self.loop = IOLoop.current()
         self._setup_logging(logger)
 
         # Attributes
@@ -2961,7 +2967,6 @@ class Scheduler(SchedulerState, ServerNode):
             )
 
         # Communication state
-        self.loop = loop or IOLoop.current()
         self.client_comms = {}
         self.stream_comms = {}
         self._worker_coroutines = []
