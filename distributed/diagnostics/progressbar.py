@@ -3,6 +3,7 @@ import logging
 import sys
 import weakref
 from contextlib import suppress
+from functools import cached_property
 from timeit import default_timer
 
 from tlz import valmap
@@ -120,13 +121,16 @@ class TextProgressBar(ProgressBar):
         start=True,
         **kwargs,
     ):
+        self._loop_runner = loop_runner = LoopRunner(loop=loop)
         super().__init__(keys, scheduler, interval, complete)
         self.width = width
-        self.loop = loop or IOLoop()
 
         if start:
-            loop_runner = LoopRunner(self.loop)
             loop_runner.run_sync(self.listen)
+
+    @cached_property
+    def loop(self):
+        return self._loop_runner.loop
 
     def _draw_bar(self, remaining, all, **kwargs):
         frac = (1 - remaining / all) if all else 1.0
