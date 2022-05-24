@@ -3,6 +3,7 @@ import datetime
 import logging
 import uuid
 from contextlib import suppress
+from functools import cached_property
 from inspect import isawaitable
 
 from tornado.ioloop import PeriodicCallback
@@ -87,7 +88,7 @@ class Cluster(SyncMethodMixin):
         }
         self.status = Status.created
 
-    @property
+    @cached_property
     def loop(self):
         return self._loop_runner.loop
 

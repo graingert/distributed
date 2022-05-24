@@ -21,7 +21,7 @@ from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures._base import DoneAndNotDoneFutures
 from contextlib import contextmanager, suppress
 from contextvars import ContextVar
-from functools import partial
+from functools import cached_property, partial
 from numbers import Number
 from queue import Queue as pyQueue
 from typing import ClassVar, Literal
@@ -950,9 +950,9 @@ class Client(SyncMethodMixin):
         warnings.warn(
             "The io_loop property is deprecated", DeprecationWarning, stacklevel=2
         )
-        return self._loop_runner.loop
+        return self.loop
 
-    @property
+    @cached_property
     def loop(self):
         return self._loop_runner.loop
 
