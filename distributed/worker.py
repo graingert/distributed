@@ -213,6 +213,9 @@ def fail_hard(method):
     return wrapper
 
 
+_os_exit = functools.partial(os._exit, 1)
+
+
 async def _force_close(self):
     """
     Used with the fail_hard decorator defined above
@@ -232,7 +235,8 @@ async def _force_close(self):
         )
         # use `os._exit` instead of `sys.exit` because of uncertainty
         # around propagating `SystemExit` from asyncio callbacks
-        os._exit(1)
+        _os_exit()
+        raise
 
 
 class Worker(ServerNode):

@@ -9,7 +9,7 @@ from tlz import concat, sliding_window
 
 from dask import delayed
 
-from distributed import Client, Nanny, wait
+from distributed import Client, Nanny, wait, worker
 from distributed.chaos import KillWorker
 from distributed.compatibility import WINDOWS
 from distributed.metrics import time
@@ -121,7 +121,8 @@ async def test_stress_creation_and_deletion(c, s):
 
 
 @gen_cluster(nthreads=[("", 1)] * 10, client=True)
-async def test_stress_scatter_death(c, s, *workers):
+async def test_stress_scatter_death(c, s, *workers, monkeypatch):
+    monkeypatch.setattr(worker, "_os_exit", asyncio.get_running_loop().stop)
     s.allowed_failures = 1000
     np = pytest.importorskip("numpy")
     L = await c.scatter(
