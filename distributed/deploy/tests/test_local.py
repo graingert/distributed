@@ -160,17 +160,18 @@ def test_transports_tcp_port():
         scheduler_port=8786,
         silence_logs=False,
         dashboard_address=":0",
+        loop=loop,
     ) as c:
 
         assert c.scheduler_address == "tcp://127.0.0.1:8786"
         assert c.workers[0].address.startswith("tcp://")
-        with Client(c.scheduler.address) as e:
+        with Client(c.scheduler.address, loop=loop) as e:
             assert e.submit(inc, 4).result() == 5
 
 
 def test_cores(loop):
     with LocalCluster(
-        2,
+        n_workers=2,
         scheduler_port=0,
         silence_logs=False,
         dashboard_address=":0",
@@ -183,7 +184,7 @@ def test_cores(loop):
 
 def test_submit(loop):
     with LocalCluster(
-        2,
+        n_workers=2,
         scheduler_port=0,
         silence_logs=False,
         dashboard_address=":0",
@@ -203,7 +204,7 @@ def test_context_manager(loop):
 
 def test_no_workers_sync(loop):
     with LocalCluster(
-        0,
+        n_workers=0,
         scheduler_port=0,
         silence_logs=False,
         dashboard_address=":0",
