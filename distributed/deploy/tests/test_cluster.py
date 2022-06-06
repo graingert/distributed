@@ -36,11 +36,11 @@ async def test_logs_deprecated():
 
 
 @gen_test()
-async def test_cluster_info():
+async def test_cluster_info(loop):
     class FooCluster(Cluster):
         def __init__(self):
             self._cluster_info["foo"] = "bar"
-            super().__init__(asynchronous=False)
+            super().__init__(asynchronous=False, loop=loop)
 
     cluster = FooCluster()
     assert "foo" in cluster._cluster_info
