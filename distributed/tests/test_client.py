@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import functools
 import gc
 import inspect
@@ -1223,18 +1224,30 @@ async def test_get_releases_data(c, s, a, b):
         await asyncio.sleep(0.01)
 
 
-def test_current(s, a, b):
-    with Client(s["address"]) as c:
+def test_current(s, a, b, loop):
+    with Client(s["address"], loop=loop) as c:
         assert Client.current() is c
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError,
+        match=r"No clients found"
+        r"\nStart a client and point it to the scheduler address"
+        r"\n  from distributed import Client"
+        r"\n  client = Client\('ip-addr-of-scheduler:8786'\)",
+    ):
         Client.current()
-    with Client(s["address"]) as c:
+    with Client(s["address"], loop=loop) as c:
         assert Client.current() is c
 
 
 def test_global_clients(loop):
     assert _get_global_client() is None
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError,
+        match=r"No clients found"
+        r"\nStart a client and point it to the scheduler address"
+        r"\n  from distributed import Client"
+        r"\n  client = Client\('ip-addr-of-scheduler:8786'\)",
+    ):
         default_client()
     with cluster() as (s, [a, b]):
         with Client(s["address"], loop=loop) as c:
@@ -1889,20 +1902,18 @@ async def test_allow_restrictions(c, s, a, b):
         c.map(inc, [20], workers="127.0.0.1", allow_other_workers="Hello!")
 
 
-def test_bad_address():
+def test_bad_address(loop):
     with pytest.raises(OSError, match="connect"):
-        Client("123.123.123.123:1234", timeout=0.1)
+        Client("123.123.123.123:1234", timeout=0.1, loop=loop)
     with pytest.raises(OSError, match="connect"):
-        Client("127.0.0.1:1234", timeout=0.1)
+        Client("127.0.0.1:1234", timeout=0.1, loop=loop)
 
 
 def test_informative_error_on_cluster_type():
-    with pytest.raises(TypeError) as exc_info:
+    with pytest.raises(
+        TypeError, match=r"Scheduler address must be a string or a Cluster instance"
+    ):
         Client(LocalCluster)
-
-    assert "Scheduler address must be a string or a Cluster instance" in str(
-        exc_info.value
-    )
 
 
 @gen_cluster(client=True)
@@ -2851,16 +2862,17 @@ async def test_startup_close_startup(s, a, b):
     await c.close()
 
 
+@pytest.mark.filterwarnings("ignore:There is no current event loop:DeprecationWarning")
 def test_startup_close_startup_sync(loop):
     with cluster() as (s, [a, b]):
         with Client(s["address"], loop=loop) as c:
             sleep(0.1)
-        with Client(s["address"]) as c:
+        with Client(s["address"], loop=None) as c:
             pass
-        with Client(s["address"]) as c:
+        with Client(s["address"], loop=None) as c:
             pass
         sleep(0.1)
-        with Client(s["address"]) as c:
+        with Client(s["address"], loop=None) as c:
             pass
 
 
@@ -2922,9 +2934,11 @@ async def test_rebalance_workers_and_keys(client, s, a, b, c):
         await client.rebalance(workers=["notexist"])
 
 
-def test_rebalance_sync():
+def test_rebalance_sync(loop):
     with dask.config.set(REBALANCE_MANAGED_CONFIG):
-        with Client(n_workers=2, processes=False, dashboard_address=":0") as c:
+        with Client(
+            n_workers=2, processes=False, dashboard_address=":0", loop=loop
+        ) as c:
             s = c.cluster.scheduler
             a = c.cluster.workers[0]
             b = c.cluster.workers[1]
@@ -3268,39 +3282,39 @@ async def test_cancel_clears_processing(c, s, *workers):
     s.validate_state()
 
 
-def test_default_get():
+def test_default_get(loop):
     with cluster() as (s, [a, b]):
         pre_get = dask.base.get_scheduler()
         pytest.raises(KeyError, dask.config.get, "shuffle")
-        with Client(s["address"], set_as_default=True) as c:
+        with Client(s["address"], set_as_default=True, loop=loop) as c:
             assert dask.base.get_scheduler() == c.get
             assert dask.config.get("shuffle") == "tasks"
 
         assert dask.base.get_scheduler() == pre_get
         pytest.raises(KeyError, dask.config.get, "shuffle")
 
-        c = Client(s["address"], set_as_default=False)
+        c = Client(s["address"], set_as_default=False, loop=loop)
         assert dask.base.get_scheduler() == pre_get
         pytest.raises(KeyError, dask.config.get, "shuffle")
         c.close()
 
-        c = Client(s["address"], set_as_default=True)
+        c = Client(s["address"], set_as_default=True, loop=loop)
         assert dask.config.get("shuffle") == "tasks"
         assert dask.base.get_scheduler() == c.get
         c.close()
         assert dask.base.get_scheduler() == pre_get
         pytest.raises(KeyError, dask.config.get, "shuffle")
 
-        with Client(s["address"]) as c:
+        with Client(s["address"], loop=loop) as c:
             assert dask.base.get_scheduler() == c.get
 
-        with Client(s["address"], set_as_default=False) as c:
+        with Client(s["address"], set_as_default=False, loop=loop) as c:
             assert dask.base.get_scheduler() != c.get
         assert dask.base.get_scheduler() != c.get
 
-        with Client(s["address"], set_as_default=True) as c1:
+        with Client(s["address"], set_as_default=True, loop=loop) as c1:
             assert dask.base.get_scheduler() == c1.get
-            with Client(s["address"], set_as_default=True) as c2:
+            with Client(s["address"], set_as_default=True, loop=loop) as c2:
                 assert dask.base.get_scheduler() == c2.get
             assert dask.base.get_scheduler() == c1.get
         assert dask.base.get_scheduler() == pre_get
@@ -3825,11 +3839,11 @@ def test_scheduler_info(c):
     assert isinstance(info["started"], float)
 
 
-def test_write_scheduler_file(c):
+def test_write_scheduler_file(c, loop):
     info = c.scheduler_info()
     with tmpfile("json") as scheduler_file:
         c.write_scheduler_file(scheduler_file)
-        with Client(scheduler_file=scheduler_file) as c2:
+        with Client(scheduler_file=scheduler_file, loop=loop) as c2:
             info2 = c2.scheduler_info()
             assert c.scheduler.address == c2.scheduler.address
 
@@ -4046,48 +4060,27 @@ async def test_as_current(c, s, a, b):
     await c2.close()
 
 
-def test_as_current_is_thread_local(s):
-    l1 = threading.Lock()
-    l2 = threading.Lock()
-    l3 = threading.Lock()
-    l4 = threading.Lock()
-    l1.acquire()
-    l2.acquire()
-    l3.acquire()
-    l4.acquire()
+def test_as_current_is_thread_local(s, loop):
+    parties = 2
+    cm_after_enter = threading.Barrier(parties=parties, timeout=5)
+    cm_before_exit = threading.Barrier(parties=parties, timeout=5)
 
-    def run1():
-        with Client(s["address"]) as c:
+    def run():
+        with Client(s["address"], loop=loop) as c:
             with c.as_current():
-                l1.acquire()
-                l2.release()
+                cm_after_enter.wait()
                 try:
-                    # This line runs only when both run1 and run2 are inside the
+                    # This line runs only when all parties are inside the
                     # context manager
                     assert Client.current(allow_global=False) is c
                 finally:
-                    l3.acquire()
-                    l4.release()
+                    cm_before_exit.wait()
 
-    def run2():
-        with Client(s["address"]) as c:
-            with c.as_current():
-                l1.release()
-                l2.acquire()
-                try:
-                    # This line runs only when both run1 and run2 are inside the
-                    # context manager
-                    assert Client.current(allow_global=False) is c
-                finally:
-                    l3.release()
-                    l4.acquire()
-
-    t1 = threading.Thread(target=run1)
-    t2 = threading.Thread(target=run2)
-    t1.start()
-    t2.start()
-    t1.join()
-    t2.join()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=parties) as tpe:
+        for fut in concurrent.futures.as_completed(
+            [tpe.submit(run) for _ in range(parties)]
+        ):
+            fut.result()
 
 
 @gen_cluster()
@@ -5529,6 +5522,7 @@ async def test_future_auto_inform(c, s, a, b):
     await client.close()
 
 
+@pytest.mark.filterwarnings("ignore:There is no current event loop:DeprecationWarning")
 def test_client_async_before_loop_starts(cleanup):
     with pristine_loop() as loop:
         with pytest.warns(
@@ -6838,6 +6832,7 @@ async def test_workers_collection_restriction(c, s, a, b):
     assert a.data and not b.data
 
 
+@pytest.mark.filterwarnings("ignore:There is no current event loop:DeprecationWarning")
 @gen_cluster(client=True, nthreads=[("127.0.0.1", 0)])
 async def test_get_client_functions_spawn_clusters(c, s, a):
     # see gh4565
