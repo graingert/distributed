@@ -444,7 +444,11 @@ class TCP(Comm):
         return self._peer_addr
 
     async def read(self, deserializers=None):
-        frames = await self._protocol.read()
+        try:
+            frames = await self._protocol.read()
+        except BaseException:
+            self.abort()
+            raise
         try:
             return await from_frames(
                 frames,
@@ -470,7 +474,11 @@ class TCP(Comm):
             },
             frame_split_size=self.max_shard_size,
         )
-        nbytes = await self._protocol.write(frames)
+        try:
+            nbytes = await self._protocol.write(frames)
+        except BaseException:
+            self.abort()
+            raise
         return nbytes
 
     async def close(self):

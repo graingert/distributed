@@ -295,6 +295,9 @@ class UCX(Comm):
         except (ucp.exceptions.UCXBaseException):
             self.abort()
             raise CommClosedError("While writing, the connection was closed")
+        except BaseException:
+            self.abort()
+            raise
 
     @log_errors
     async def read(self, deserializers=("cuda", "dask", "pickle", "error")):
@@ -325,6 +328,9 @@ class UCX(Comm):
         ) + (getattr(ucp.exceptions, "UCXConnectionReset", ()),):
             self.abort()
             raise CommClosedError("Connection closed by writer")
+        except BaseException:
+            self.abort()
+            raise
         else:
             # Recv frames
             frames = [
@@ -368,6 +374,9 @@ class UCX(Comm):
                 # UCX will sometimes raise a `Input/output` error,
                 # which we can ignore.
                 pass
+            except BaseException:
+                self.abort()
+                raise
             self.abort()
             self._ep = None
 

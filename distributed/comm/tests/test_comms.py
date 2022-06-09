@@ -879,6 +879,53 @@ async def test_comm_closed_on_buffer_error(tcp):
     await writer.close()
 
 
+async def check_comm_cancel_op(op, addr, listen_args={}, connect_args={}):
+    a, b = await get_comm_pair(addr, listen_args=listen_args, connect_args=connect_args)
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(op(a), 0.05)
+    with pytest.raises(CommClosedError):
+        await op(a)
+    a.abort()
+    b.abort()
+
+
+_op_params = pytest.mark.parametrize(
+    "op",
+    [
+        pytest.param(lambda v: v.read(), id="read"),
+        pytest.param(lambda v: v.write({"demo": bytes(9999999)}), id="write"),
+        pytest.param(lambda v: v.close(), id="close"),
+    ],
+)
+
+
+@_op_params
+@pytest.mark.parametrize(
+    "address,kwargs",
+    [
+        ("tcp://127.0.0.1", {}),
+        ("tls://127.0.0.1", tls_kwargs),
+    ],
+)
+@gen_test()
+async def test_tcp_comm_cancel_op(op, address, kwargs, tcp):
+    await check_comm_cancel_op(op, "tcp://127.0.0.1")
+
+
+@_op_params
+@pytest.mark.parametrize(
+    "address_fn,kwargs",
+    [
+        (lambda: "wss://", tls_kwargs),
+        (lambda: "ws://", {}),
+        (inproc.new_address, {}),
+    ],
+)
+@gen_test()
+async def test_other_comm_cancel_op(op, address_fn, kwargs):
+    await check_comm_cancel_op(op, address_fn(), **kwargs)
+
+
 #
 # Various stress tests
 #

@@ -104,7 +104,9 @@ class Queue:
         return q.popleft()
 
     def get(self):
-        assert not self._read_future, "Only one reader allowed"
+        if self._read_future is not None:
+            raise RuntimeError("Only one reader allowed")
+
         fut = Future()
         q = self._q
         if q:
@@ -119,7 +121,8 @@ class Queue:
         if fut is not None:
             assert len(q) == 0
             self._read_future = None
-            fut.set_result(value)
+            if not fut.cancelled():
+                fut.set_result(value)
         else:
             q.append(value)
 
@@ -193,7 +196,12 @@ class InProc(Comm):
         if self._closed:
             raise CommClosedError()
 
-        msg = await self._read_q.get()
+        try:
+            msg = await self._read_q.get()
+        except BaseException:
+            self.abort()
+            raise
+
         if msg is _EOF:
             self._closed = True
             self._finalizer.detach()

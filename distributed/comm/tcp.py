@@ -240,7 +240,7 @@ class TCP(Comm):
             self._closed = True
             if not sys.is_finalizing():
                 convert_stream_closed_error(self, e)
-        except Exception:
+        except BaseException:
             # Some OSError or a another "low-level" exception. We do not really know what
             # was already read from the underlying socket, so it is not even safe to retry
             # here using the same stream. The only safe thing to do is to abort.
@@ -311,13 +311,13 @@ class TCP(Comm):
                     stream._total_write_index += each_frame_nbytes
 
             # start writing frames
-            stream.write(b"")
+            await stream.write(b"")
         except StreamClosedError as e:
             self.stream = None
             self._closed = True
             if not sys.is_finalizing():
                 convert_stream_closed_error(self, e)
-        except Exception:
+        except BaseException:
             # Some OSError or a another "low-level" exception. We do not really know
             # what was already written to the underlying socket, so it is not even safe
             # to retry here using the same stream. The only safe thing to do is to

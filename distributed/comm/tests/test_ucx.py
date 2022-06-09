@@ -9,7 +9,7 @@ pytestmark = pytest.mark.gpu
 ucp = pytest.importorskip("ucp")
 
 from distributed import Client, Scheduler, wait
-from distributed.comm import connect, listen, parse_address, ucx
+from distributed.comm import CommClosedError, connect, listen, parse_address, ucx
 from distributed.comm.registry import backends, get_backend
 from distributed.deploy.local import LocalCluster
 from distributed.diagnostics.nvml import has_cuda_context
@@ -363,3 +363,14 @@ async def test_ucx_unreachable(
 ):
     with pytest.raises(OSError, match="Timed out trying to connect to"):
         await Client("ucx://255.255.255.255:12345", timeout=1, asynchronous=True)
+
+
+@gen_test()
+async def test_comm_cancel_read():
+    a, b = await get_comm_pair()
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(a.read(), 0.05)
+    with pytest.raises(CommClosedError):
+        await a.read()
+    a.abort()
+    b.abort()

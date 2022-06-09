@@ -107,14 +107,20 @@ class WSHandlerComm(Comm):
     async def read(self, deserializers=None):
         try:
             n_frames = await self.handler.q.get()
-        except RuntimeError:  # Event loop is closed
-            raise CommClosedError()
+        except BaseException:
+            self.abort()
+            raise
 
         if n_frames is CommClosedError:
             raise CommClosedError()
         else:
             n_frames = struct.unpack("Q", n_frames)[0]
-        frames = [(await self.handler.q.get()) for _ in range(n_frames)]
+        try:
+            frames = [(await self.handler.q.get()) for _ in range(n_frames)]
+        except BaseException:
+            self.abort()
+            raise
+
         return await from_frames(
             frames,
             deserialize=self.deserialize,
@@ -146,6 +152,9 @@ class WSHandlerComm(Comm):
                 nbytes_frames += len(frame)
         except WebSocketClosedError as e:
             raise CommClosedError(str(e))
+        except BaseException:
+            self.abort()
+            raise
 
         return nbytes_frames
 
@@ -204,8 +213,15 @@ class WS(Comm):
             n_frames = struct.unpack("Q", n_frames)[0]
         except WebSocketClosedError as e:
             raise CommClosedError(e)
+        except BaseException:
+            self.abort()
+            raise
 
-        frames = [(await self.sock.read_message()) for _ in range(n_frames)]
+        try:
+            frames = [(await self.sock.read_message()) for _ in range(n_frames)]
+        except BaseException:
+            self.abort()
+            raise
 
         msg = await from_frames(
             frames,
@@ -239,6 +255,8 @@ class WS(Comm):
                 nbytes_frames += len(frame)
         except WebSocketClosedError as e:
             raise CommClosedError(e)
+        except BaseException:
+            self.abort()
 
         return nbytes_frames
 
