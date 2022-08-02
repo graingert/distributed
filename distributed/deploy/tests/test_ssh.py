@@ -14,7 +14,6 @@ from distributed.deploy.ssh import SSHCluster
 from distributed.utils_test import gen_test
 
 pytestmark = [
-    pytest.mark.xfail(MACOS, reason="very high flakiness; see distributed/issues/4543"),
     pytest.mark.skipif(WINDOWS, reason="no CI support; see distributed/issues/4509"),
 ]
 
