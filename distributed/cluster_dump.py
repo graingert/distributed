@@ -320,7 +320,7 @@ class DumpArtefact(Mapping):
 
             for name, _logs in worker_state.items():
                 filename = str(log_dir / f"{name}.yaml")
-                with open(filename, "w") as fd:
+                with open(filename, "w", encoding="utf8") as fd:
                     yaml.dump(_logs, fd, Dumper=dumper)
 
         context = "scheduler"
@@ -333,5 +333,5 @@ class DumpArtefact(Mapping):
         for name, _logs in scheduler_state.items():
             filename = str(log_dir / f"{name}.yaml")
 
-            with open(filename, "w") as fd:
+            with open(filename, "w", encoding="utf8") as fd:
                 yaml.dump(_logs, fd, Dumper=dumper)

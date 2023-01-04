@@ -1147,7 +1147,7 @@ async def dump_cluster_state(
     }
     os.makedirs(output_dir, exist_ok=True)
     fname = os.path.join(output_dir, func_name) + ".yaml"
-    with open(fname, "w") as fh:
+    with open(fname, "w", encoding="utf8") as fh:
         yaml.safe_dump(state, fh)  # Automatically convert tuples to lists
     print(f"Dumped cluster state to {fname}")
 
@@ -1491,7 +1491,7 @@ def new_config_file(c):
     old_file = os.environ.get("DASK_CONFIG")
     fd, path = tempfile.mkstemp(prefix="dask-config")
     try:
-        with os.fdopen(fd, "w") as f:
+        with os.fdopen(fd, "w", encoding="utf8") as f:
             f.write(yaml.dump(c))
         os.environ["DASK_CONFIG"] = path
         try:

@@ -57,7 +57,7 @@ async def test_prometheus_api_doc(c, s, a):
 
     documented = set()
     root_dir = pathlib.Path(__file__).parent.parent.parent.parent
-    with open(root_dir / "docs" / "source" / "prometheus.rst") as fh:
+    with (root_dir / "docs" / "source" / "prometheus.rst").open(encoding="utf8") as fh:
         for row in fh:
             row = row.strip()
             if row.startswith("dask_"):

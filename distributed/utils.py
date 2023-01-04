@@ -629,7 +629,7 @@ def set_thread_state(**kwargs):
 @contextmanager
 def tmp_text(filename, text):
     fn = os.path.join(tempfile.gettempdir(), filename)
-    with open(fn, "w") as f:
+    with open(fn, "w", encoding="utf8") as f:
         f.write(text)
 
     try:

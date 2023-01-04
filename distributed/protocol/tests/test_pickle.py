@@ -209,7 +209,7 @@ def test_pickle_by_value_when_registered():
             try:
                 sys.path.insert(0, d)
                 module = f"{d}/mymodule.py"
-                with open(module, "w") as f:
+                with open(module, "w", encoding="utf8") as f:
                     f.write("def myfunc(x):\n    return x + 1")
                 import mymodule  # noqa
 

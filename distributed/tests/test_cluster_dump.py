@@ -45,7 +45,7 @@ async def test_write_state_yaml(tmp_path):
     path = str(tmp_path / "bar")
     await write_state(get_state, path, "yaml")
 
-    with open(f"{path}.yaml") as f:
+    with open(f"{path}.yaml", encoding="utf8") as f:
         readback = yaml.safe_load(f)
         assert readback == _tuple_to_list(await get_state())
         f.seek(0)

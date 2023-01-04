@@ -310,11 +310,11 @@ class Security:
                 with tempfile.TemporaryDirectory() as tempdir:
                     if cert_in_memory:
                         cert_path = os.path.join(tempdir, "dask.crt")
-                        with open(cert_path, "w") as f:
+                        with open(cert_path, "w", encoding="ascii") as f:
                             f.write(cert)
                     if key_in_memory:
                         key_path = os.path.join(tempdir, "dask.pem")
-                        with open(key_path, "w") as f:
+                        with open(key_path, "w", encoding="ascii") as f:
                             f.write(key)
                     ctx.load_cert_chain(cert_path, key_path)
             else:

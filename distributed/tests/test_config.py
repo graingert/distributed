@@ -236,7 +236,7 @@ level=ERROR
 handlers=console
 qualname=foo.bar
 """
-    with tempfile.NamedTemporaryFile(mode="w", delete=False) as logging_config:
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf8", delete=False) as logging_config:
         logging_config.write(logging_config_contents)
     dask_config = {"logging-file-config": logging_config.name}
     with new_config_file(dask_config):
@@ -257,10 +257,10 @@ def test_schema():
     config_fn = os.path.join(os.path.dirname(__file__), "..", "distributed.yaml")
     schema_fn = os.path.join(os.path.dirname(__file__), "..", "distributed-schema.yaml")
 
-    with open(config_fn) as f:
+    with open(config_fn, "rb") as f:
         config = yaml.safe_load(f)
 
-    with open(schema_fn) as f:
+    with open(schema_fn, "rb") as f:
         schema = yaml.safe_load(f)
 
     jsonschema.validate(config, schema)
@@ -270,10 +270,10 @@ def test_schema_is_complete():
     config_fn = os.path.join(os.path.dirname(__file__), "..", "distributed.yaml")
     schema_fn = os.path.join(os.path.dirname(__file__), "..", "distributed-schema.yaml")
 
-    with open(config_fn) as f:
+    with open(config_fn, "rb") as f:
         config = yaml.safe_load(f)
 
-    with open(schema_fn) as f:
+    with open(schema_fn, "rb") as f:
         schema = yaml.safe_load(f)
 
     skip = {

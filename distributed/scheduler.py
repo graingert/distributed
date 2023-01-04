@@ -7635,7 +7635,7 @@ class Scheduler(SchedulerState, ServerNode):
             template = template_environment.get_template("performance_report.html")
             save(tabs, filename=fn, template=template)
 
-            with open(fn) as f:
+            with open(fn, encoding="utf8") as f:
                 data = f.read()
 
         return data

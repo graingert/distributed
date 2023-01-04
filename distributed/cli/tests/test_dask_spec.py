@@ -38,7 +38,7 @@ async def test_text():
 @gen_cluster(client=True, nthreads=[])
 async def test_file(c, s, tmp_path):
     fn = str(tmp_path / "foo.yaml")
-    with open(fn, "w") as f:
+    with open(fn, "w", encoding="utf8") as f:
         yaml.dump(
             {
                 "cls": "dask.distributed.Worker",

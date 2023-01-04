@@ -563,7 +563,7 @@ class MyWorker(Worker):
 """
     tmpdir = str(tmp_path)
     tmpfile = str(tmp_path / "myworker.py")
-    with open(tmpfile, "w") as f:
+    with open(tmpfile, "w", encoding="utf8") as f:
         f.write(WORKER_CLASS_TEXT)
 
     # Put module on PYTHONPATH

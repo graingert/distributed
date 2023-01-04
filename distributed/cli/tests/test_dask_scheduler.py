@@ -241,7 +241,7 @@ def test_pid_file(loop):
         while not text:
             sleep(0.01)
             assert time() < start + 30
-            with open(pidfile) as f:
+            with open(pidfile, encoding="ascii") as f:
                 text = f.read()
         pid = int(text)
         if sys.platform.startswith("win"):
@@ -324,8 +324,7 @@ def test_preload_file(loop, tmp_path):
         return scheduler_info.get_scheduler_address()
 
     path = tmp_path / "scheduler_info.py"
-    with open(path, "w") as f:
-        f.write(PRELOAD_TEXT)
+    path.write_text(PRELOAD_TEXT, encoding="utf8")
     with tmpfile() as fn:
         with popen(
             [
@@ -349,8 +348,7 @@ def test_preload_module(loop, tmp_path):
         return scheduler_info.get_scheduler_address()
 
     path = tmp_path / "scheduler_info.py"
-    with open(path, "w") as f:
-        f.write(PRELOAD_TEXT)
+    path.write_text(PRELOAD_TEXT, encoding="utf8")
     env = os.environ.copy()
     if "PYTHONPATH" in env:
         env["PYTHONPATH"] = str(tmp_path) + ":" + env["PYTHONPATH"]
@@ -374,8 +372,7 @@ def test_preload_module(loop, tmp_path):
 
 
 def test_preload_remote_module(loop, tmp_path):
-    with open(tmp_path / "scheduler_info.py", "w") as f:
-        f.write(PRELOAD_TEXT)
+    (tmp_path / "scheduler_info.py").write_text(PRELOAD_TEXT, encoding="utf8")
     http_server_port = open_port()
     with popen(
         [sys.executable, "-m", "http.server", str(http_server_port)], cwd=tmp_path
@@ -439,7 +436,7 @@ def test_preload_command(loop):
     tmpdir = tempfile.mkdtemp()
     try:
         path = os.path.join(tmpdir, "passthrough_info.py")
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf8") as f:
             f.write(PRELOAD_COMMAND_TEXT)
 
         with tmpfile() as fn:
@@ -471,7 +468,7 @@ def test_preload_command_default(loop):
     tmpdir = tempfile.mkdtemp()
     try:
         path = os.path.join(tmpdir, "passthrough_info.py")
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf8") as f:
             f.write(PRELOAD_COMMAND_TEXT)
 
         with tmpfile() as fn2:

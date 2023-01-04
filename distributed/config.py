@@ -18,7 +18,7 @@ config = dask.config.config
 
 fn = os.path.join(os.path.dirname(__file__), "distributed.yaml")
 
-with open(fn) as f:
+with open(fn, "rb") as f:
     defaults = yaml.safe_load(f)
 
 dask.config.update_defaults(defaults)

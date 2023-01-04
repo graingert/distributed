@@ -150,7 +150,7 @@ def test_get_task_stream_save(client, tmp_path):
 
     with get_task_stream(plot="save", filename=fn) as ts:
         wait(client.map(inc, range(10)))
-    with open(fn) as f:
+    with open(fn, encoding="utf8") as f:
         data = f.read()
     assert "inc" in data
     assert "bokeh" in data

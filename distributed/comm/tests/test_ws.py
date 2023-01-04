@@ -96,9 +96,9 @@ async def test_expect_scheduler_ssl_when_sharing_server(tmp_path):
     security = Security.temporary()
     key_path = os.path.join(str(tmp_path), "dask.pem")
     cert_path = os.path.join(str(tmp_path), "dask.crt")
-    with open(key_path, "w") as f:
+    with open(key_path, "w", encoding="utf8") as f:
         f.write(security.tls_scheduler_key)
-    with open(cert_path, "w") as f:
+    with open(cert_path, "w", encoding="utf8") as f:
         f.write(security.tls_scheduler_cert)
     c = {
         "distributed.scheduler.dashboard.tls.key": key_path,

@@ -1259,7 +1259,7 @@ class Client(SyncMethodMixin):
                 await asyncio.sleep(0.01)
             for _ in range(10):
                 try:
-                    with open(self.scheduler_file) as f:
+                    with open(self.scheduler_file, "rb") as f:
                         cfg = json.load(f)
                     address = cfg["address"]
                     break
@@ -4272,7 +4272,7 @@ class Client(SyncMethodMixin):
         else:
             self.scheduler_file = scheduler_file
 
-        with open(self.scheduler_file, "w") as f:
+        with open(self.scheduler_file, "w", encoding="utf8") as f:
             json.dump(self.scheduler_info(), f, indent=2)
 
     def get_metadata(self, keys, default=no_default):
@@ -5561,7 +5561,7 @@ class performance_report:
         data = await client.scheduler.performance_report(
             start=self.start, last_count=self.last_count, code=code, mode=self.mode
         )
-        with open(self.filename, "w") as f:
+        with open(self.filename, "w", encoding="utf8") as f:
             f.write(data)
 
     def __enter__(self):
